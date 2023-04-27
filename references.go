@@ -91,27 +91,31 @@ func walkGraph(result *[]*object.Commit, seen *map[plumbing.Hash]struct{}, curre
 		*result = append(*result, current)
 		return nil
 	case 1: // only one parent contains the path
-		// if the file contents has change, add the current commit
-		different, err := differentContents(path, current, parents)
-		if err != nil {
-			return err
-		}
-		if len(different) == 1 {
-			*result = append(*result, current)
-		}
-		// in any case, walk the parent
-		return walkGraph(result, seen, parents[0], path)
+		return walkParent(result, seen, current, path, parents[0])
 	default: // more than one parent contains the path
 		// TODO: detect merges that had a conflict, because they must be
 		// included in the result here.
 		for _, p := range parents {
-			err := walkGraph(result, seen, p, path)
+			err := walkParent(result, seen, current, path, p)
 			if err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func walkParent(result *[]*object.Commit, seen *map[plumbing.Hash]struct{}, current *object.Commit, path string, parent *object.Commit) error {
+	// if the file contents has change, add the current commit
+	different, err := differentContents(path, current, []*object.Commit{parent})
+	if err != nil {
+		return err
+	}
+	if len(different) == 1 {
+		*result = append(*result, current)
+	}
+	// in any case, walk the parent
+	return walkGraph(result, seen, parent, path)
 }
 
 func parentsContainingPath(path string, c *object.Commit) ([]*object.Commit, error) {
